@@ -28,64 +28,64 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.ViewModelProvider
 import com.example.myapplication.models.User
 import com.example.myapplication.objects.RetrofitClient
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
+import androidx.lifecycle.ViewModel
+import com.example.myapplication.viewmodels.UserViewModel
+import com.example.myapplication.models.UserRepository
+import androidx.lifecycle.viewmodel.compose.viewModel
+
 
 class ActivityGetUser : AppCompatActivity() {
-        override fun onCreate(savedInstanceState: Bundle?) {
-            super.onCreate(savedInstanceState)
-            setContent {
-                GetUserScreen()
-            }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            val viewModel: UserViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    val repository = UserRepository(RetrofitClient.apiService)
+                    return UserViewModel(repository) as T
+                }
+            })
+            GetUserScreen(viewModel)
         }
     }
+}
 
-    @Composable
-    fun GetUserScreen() {
-        var users by remember { mutableStateOf<List<User>>(emptyList()) }
-        var isLoading by remember { mutableStateOf(true) }
-        var errorMessage by remember { mutableStateOf<String?>(null) }
+@Composable
+fun GetUserScreen(viewModel: UserViewModel) {
+    val users = viewModel.users
+    val isLoading = viewModel.isLoading
+    val errorMessage = viewModel.errorMessage
 
-        // Викликаємо API і отримуємо список користувачів
-        LaunchedEffect(Unit) {
-            fetchUsers { fetchedUsers, error ->
-                users = fetchedUsers
-                isLoading = false
-                errorMessage = error
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-            } else if (errorMessage != null) {
-                Text(
-                    text = "Помилка: $errorMessage",
-                    color = MaterialTheme.colors.error,
-                    style = MaterialTheme.typography.body1,
-                    modifier = Modifier.padding(16.dp)
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(users) { user ->
-                        UserItem(user)
-                    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        when {
+            isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            errorMessage != null -> Text(
+                text = "Помилка: $errorMessage",
+                color = MaterialTheme.colors.error,
+                style = MaterialTheme.typography.body1,
+                modifier = Modifier.padding(16.dp)
+            )
+            else -> LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(users) { user ->
+                    UserItem(user)
                 }
             }
         }
     }
+}
 
-    @Composable
+@Composable
     fun UserItem(user: User) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -97,28 +97,4 @@ class ActivityGetUser : AppCompatActivity() {
                 Text("Played Hours: ${user.playedHours}")
             }
         }
-    }
-
-    fun fetchUsers(callback: (List<User>, String?) -> Unit) {
-        RetrofitClient.apiService.getUsers().enqueue(object : Callback<List<User>> {
-            override fun onResponse(call: Call<List<User>>, response: Response<List<User>>) {
-                if (response.isSuccessful) {
-                    response.body()?.let {
-                        callback(it, null)
-                    }
-                } else {
-                    callback(emptyList(), "Не вдалося отримати дані користувачів.")
-                }
-            }
-
-            override fun onFailure(call: Call<List<User>>, t: Throwable) {
-                callback(emptyList(), t.message)
-            }
-        })
-    }
-
-    @Preview(showBackground = true)
-    @Composable
-    fun GetUserView() {
-        GetUserScreen()
     }
